@@ -39,7 +39,6 @@ public class ExampleMetricsBean {
 	private MetricsRegistry registry;
 	private Counter repositoriesParsed;
 	private AtomicLong reqSent;
-	private Gauge<AtomicLong> numReqSend;
 	private JmxReporter reporter;
 	private Timer pageProcTimer;
 
@@ -49,7 +48,7 @@ public class ExampleMetricsBean {
 		registry = new MetricsRegistry();
 		repositoriesParsed = registry.newCounter(ExampleMetricsBean.class, "Repositories-Parsed");
 		pageProcTimer = registry.newTimer(ExampleMetricsBean.class, "Processing-Page-Time");
-		numReqSend = registry.newGauge(new MetricName(ExampleMetricsBean.class, "Requests-Send-Total"), new Gauge<AtomicLong>() {
+		registry.newGauge(new MetricName(ExampleMetricsBean.class, "Requests-Send-Total"), new Gauge<AtomicLong>() {
 			@Override
 			public AtomicLong value() {
 				return reqSent;
