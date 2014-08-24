@@ -22,21 +22,29 @@ import org.slf4j.LoggerFactory;
 
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.core.Timer;
+import com.yammer.metrics.core.TimerContext;
 import com.yammer.metrics.reporting.JmxReporter;
 
 @Singleton
 @Startup
 public class ExampleMetricsBean {
+	private static final String REST_REPOSITORIES_URL = "https://bitbucket.org/api/2.0/repositories/hascode";
+
 	private final Logger log = LoggerFactory.getLogger(ExampleMetricsBean.class);
 
-	private Counter numReqSend;
 	private MetricsRegistry registry;
+	private Counter numReqSend;
+	private Counter repositoriesParsed;
 	private JmxReporter reporter;
+	private Timer pageProcTimer;
 
 	@PostConstruct
 	protected void onBeanConstruction() {
 		registry = new MetricsRegistry();
 		numReqSend = registry.newCounter(ExampleMetricsBean.class, "Number-of-Request");
+		repositoriesParsed = registry.newCounter(ExampleMetricsBean.class, "Repositories-Parsed");
+		pageProcTimer = registry.newTimer(ExampleMetricsBean.class, "Processing-Page-Time");
 		reporter = new JmxReporter(registry);
 		reporter.start();
 	}
@@ -50,12 +58,14 @@ public class ExampleMetricsBean {
 	@Schedule(second = "*/30", minute = "*", hour = "*")
 	public void parseBitbucketRepositories() throws MalformedURLException {
 		log.info("parsing bitbucket repositories");
-		URL url = new URL("https://bitbucket.org/api/2.0/repositories/hascode");
+		URL url = new URL(REST_REPOSITORIES_URL);
+		repositoriesParsed.clear();
 		queryBitbucket(url);
 	}
 
 	private void queryBitbucket(final URL url) {
 		try (InputStream is = url.openStream(); JsonReader rdr = Json.createReader(is)) {
+			TimerContext timerCtx = pageProcTimer.time();
 			numReqSend.inc();
 			JsonObject obj = rdr.readObject();
 			JsonNumber currentElements = obj.getJsonNumber("pagelen");
@@ -63,9 +73,10 @@ public class ExampleMetricsBean {
 			log.info("{} elements on current page, next page is: {}", currentElements, nextPage);
 			JsonArray repositories = obj.getJsonArray("values");
 			for (JsonObject repository : repositories.getValuesAs(JsonObject.class)) {
-				String info = String.format("Repository '{}', URL: {}", repository.getJsonString("name").getString(), "");
-				log.info(info);
+				repositoriesParsed.inc();
+				log.info("repository '{}' has url: '{}'", repository.getString("name"), repository.getJsonObject("links").getJsonObject("self").getString("href"));
 			}
+			timerCtx.stop();
 			if (nextPage != null) {
 				queryBitbucket(new URL(nextPage.getString()));
 			}
