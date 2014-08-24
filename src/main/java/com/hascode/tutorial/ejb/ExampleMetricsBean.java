@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -21,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.Gauge;
+import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.core.Timer;
 import com.yammer.metrics.core.TimerContext;
@@ -34,17 +37,24 @@ public class ExampleMetricsBean {
 	private final Logger log = LoggerFactory.getLogger(ExampleMetricsBean.class);
 
 	private MetricsRegistry registry;
-	private Counter numReqSend;
 	private Counter repositoriesParsed;
+	private AtomicLong reqSent;
+	private Gauge<AtomicLong> numReqSend;
 	private JmxReporter reporter;
 	private Timer pageProcTimer;
 
 	@PostConstruct
 	protected void onBeanConstruction() {
+		reqSent = new AtomicLong(0);
 		registry = new MetricsRegistry();
-		numReqSend = registry.newCounter(ExampleMetricsBean.class, "Number-of-Request");
 		repositoriesParsed = registry.newCounter(ExampleMetricsBean.class, "Repositories-Parsed");
 		pageProcTimer = registry.newTimer(ExampleMetricsBean.class, "Processing-Page-Time");
+		numReqSend = registry.newGauge(new MetricName(ExampleMetricsBean.class, "Requests-Send-Total"), new Gauge<AtomicLong>() {
+			@Override
+			public AtomicLong value() {
+				return reqSent;
+			}
+		});
 		reporter = new JmxReporter(registry);
 		reporter.start();
 	}
@@ -66,7 +76,7 @@ public class ExampleMetricsBean {
 	private void queryBitbucket(final URL url) {
 		try (InputStream is = url.openStream(); JsonReader rdr = Json.createReader(is)) {
 			TimerContext timerCtx = pageProcTimer.time();
-			numReqSend.inc();
+			reqSent.incrementAndGet();
 			JsonObject obj = rdr.readObject();
 			JsonNumber currentElements = obj.getJsonNumber("pagelen");
 			JsonString nextPage = obj.getJsonString("next");
