@@ -2,8 +2,6 @@ package com.hascode.tutorial.ejb;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.ejb.LocalBean;
-import javax.ejb.Stateful;
 import javax.inject.Inject;
 import javax.json.JsonArray;
 import javax.json.JsonNumber;
@@ -18,8 +16,6 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.annotation.Metric;
 import com.codahale.metrics.annotation.Timed;
 
-@Stateful
-@LocalBean
 public class RepositoryProcessor {
 	private final Logger log = LoggerFactory.getLogger(RepositoryProcessor.class);
 	private final AtomicLong reqSent = new AtomicLong(0);
